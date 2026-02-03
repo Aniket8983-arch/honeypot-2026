@@ -1,41 +1,43 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # This is a new helper
 
 app = Flask(__name__)
+CORS(app) # This tells the server to accept requests from other websites
 
-# This is your "Password" for the judges
 VALID_API_KEY = "hackathon-super-secret-2026"
 
 @app.route('/')
 def home():
-    return "Honeypot API is Online."
+    return "Honeypot Active", 200
 
-# THE MAIN TEST ENDPOINT
-@app.route('/api/validate', methods=['GET', 'POST', 'PUT'])
+@app.route('/api/validate', methods=['GET', 'POST', 'OPTIONS'])
 def validate():
-    # 1. Log the attempt in Render's logs
-    print(f"Validation attempt received via {request.method}")
-    
-    # 2. Check for the Header
-    user_key = request.headers.get('X-Api-Key')
+    # 1. Handle "Pre-flight" (Testers often send this first)
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    # 2. Consume any incoming body data (Fixes INVALID_REQUEST_BODY)
+    # Even if we don't use the data, we must read it.
+    try:
+        if request.data:
+            request.get_json(silent=True, force=True)
+    except:
+        pass
+
+    # 3. Check for the Header
+    user_key = request.headers.get('x-api-key') # Case insensitive
     
     if user_key == VALID_API_KEY:
         return jsonify({
             "status": "success",
-            "message": "Endpoint Reachable & Secured",
-            "agent_status": "active"
+            "message": "Honeypot Reachable & Secured"
         }), 200
-    else:
-        return jsonify({
-            "status": "fail",
-            "message": "Unauthorized: Invalid API Key"
-        }), 401
-
-# THE TRAP ENDPOINT (The "Honey")
-@app.route('/admin/config', methods=['GET', 'POST'])
-def trap():
-    client_ip = request.headers.get('x-forwarded-for', request.remote_addr)
-    print(f"!!! SCAMMER DETECTED !!! IP: {client_ip} tried to access admin config.")
-    return jsonify({"error": "Access Denied", "logged": True}), 403
+    
+    # 4. If key is wrong
+    return jsonify({
+        "status": "fail",
+        "message": "Unauthorized"
+    }), 401
 
 if __name__ == "__main__":
     app.run()
