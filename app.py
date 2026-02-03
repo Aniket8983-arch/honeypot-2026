@@ -56,7 +56,7 @@ def generate_counter_reply(text):
     elif any(x in text for x in ["bitcoin", "crypto", "investment", "profit", "mining", "wallet"]):
         options = [
             "I have heard of Bitcoin. Is that the internet money?",
-            "If I give you $500, can you guarantee I will be rich by Tuesday?",
+            "If I give you ₹500, can you guarantee I will be rich by Tuesday?",
             "I don't know how to buy crypto. Can you log into my PC and do it for me?",
             "Is this safe? My son says crypto is for criminals."
         ]
@@ -65,7 +65,7 @@ def generate_counter_reply(text):
     # SCENARIO 5: Bank / Money (The Classic)
     elif any(x in text for x in ["bank", "account", "unusual activity", "fund", "transfer", "urgent"]):
         options = [
-            "I have accounts at Chase and Bank of America. Which one is leaking?",
+            "I have accounts at QWE and Bank of XYZ. Which one is leaking?",
             "I didn't authorize any transfer! Stop it immediately!",
             "I am looking at my statement and I don't see it yet. Is it invisible?",
             "Can I go to the local branch and talk to the manager, Mr. Henderson?"
