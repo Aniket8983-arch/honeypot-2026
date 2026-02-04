@@ -2,97 +2,77 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import datetime
 import random
+import json
 
 app = Flask(__name__)
-CORS(app)  # Enables the Judge's tester to connect from their website
+CORS(app)  # Allows the Judge's tester to connect from their website
 
 # --- CONFIGURATION ---
-# This is the password you will type in the Judge's Tester
 VALID_API_KEY = "honeypot2026"
 
 # --- FAKE DATABASE (In-Memory Storage) ---
-# Stores all the scam attempts while the server is running
 SCAM_DATABASE = []
 
 # --- 1. THE CONVERSATIONAL AGENT (The "Mouth") ---
 def generate_counter_reply(text):
-    """
-    Analyzes the 'Story' of the scam and selects a context-aware reply
-    to waste the scammer's time.
-    """
     text = text.lower()
     
     # SCENARIO 1: Package / Delivery
-    if any(x in text for x in ["parcel", "delivery", "shipping", "fedex", "ups", "usps", "address"]):
-        options = [
-            "I have been waiting for a package! Which address did you try to deliver to?",
+    if any(x in text for x in ["parcel", "delivery", "shipping", "fedex", "ups", "usps"]):
+        return random.choice([
+            "I have been waiting for a package! Which address did you try?",
             "Is this the gift for my grandson? I ordered a toy train.",
-            "I am home right now. Can the driver just come back and knock louder?",
             "I don't have a credit card for the fee. Can I pay the driver in cash?"
-        ]
-        return random.choice(options)
+        ])
 
     # SCENARIO 2: Tech Support / Virus
-    elif any(x in text for x in ["virus", "infected", "microsoft", "detected", "trojan", "hacked"]):
-        options = [
-            "Oh my goodness! Is that why my screen is blinking?",
+    elif any(x in text for x in ["virus", "infected", "microsoft", "detected", "hacked"]):
+        return random.choice([
             "I am unplugging the computer right now! Should I put it in rice?",
             "My nephew installed a game yesterday. Did he cause this?",
             "I see a number on the screen. Should I call that or 911?"
-        ]
-        return random.choice(options)
+        ])
 
     # SCENARIO 3: IRS / Tax / Warrant
-    elif any(x in text for x in ["tax", "irs", "warrant", "arrest", "police", "legal action"]):
-        options = [
+    elif any(x in text for x in ["tax", "irs", "warrant", "arrest", "police"]):
+        return random.choice([
             "Please don't arrest me! I am 82 years old.",
             "I paid my accountant last month. Did he steal the money?",
-            "Can I pay this with a Target gift card? I heard that works.",
-            "My heart is racing. Let me get my medication before we continue."
-        ]
-        return random.choice(options)
+            "Can I pay this with a Target gift card? I heard that works."
+        ])
 
     # SCENARIO 4: Crypto / Investment
-    elif any(x in text for x in ["bitcoin", "crypto", "investment", "profit", "mining", "wallet"]):
-        options = [
-            "I have heard of Bitcoin. Is that the internet money?",
-            "If I give you ₹500, can you guarantee I will be rich by Tuesday?",
+    elif any(x in text for x in ["bitcoin", "crypto", "investment", "profit", "wallet"]):
+        return random.choice([
+            "If I give you $500, can you guarantee I will be rich by Tuesday?",
             "I don't know how to buy crypto. Can you log into my PC and do it for me?",
             "Is this safe? My son says crypto is for criminals."
-        ]
-        return random.choice(options)
+        ])
 
     # SCENARIO 5: Bank / Money (The Classic)
-    elif any(x in text for x in ["bank", "account", "unusual activity", "fund", "transfer", "urgent"]):
-        options = [
-            "I have accounts at QWE and Bank of XYZ. Which one is leaking?",
+    elif any(x in text for x in ["bank", "account", "unusual", "fund", "transfer", "urgent"]):
+        return random.choice([
+            "I have accounts at Chase and Bank of America. Which one is leaking?",
             "I didn't authorize any transfer! Stop it immediately!",
-            "I am looking at my statement and I don't see it yet. Is it invisible?",
             "Can I go to the local branch and talk to the manager, Mr. Henderson?"
-        ]
-        return random.choice(options)
+        ])
 
-    # FALLBACK: General Confusion
-    else:
-        options = [
-            "I am reading your message but I left my glasses in the car. What does it say?",
-            "Who is this? Is this my grandson, Billy?",
-            "I am sorry, I think you have the wrong number. This is a church line.",
-            "My internet is very slow today. Can you send that again?"
-        ]
-        return random.choice(options)
+    # FALLBACK
+    return random.choice([
+        "I am reading your message but I left my glasses in the car. What does it say?",
+        "Who is this? Is this my grandson, Billy?",
+        "My internet is very slow today. Can you send that again?"
+    ])
 
 # --- 2. THE INTELLIGENCE ENGINE (The "Brain") ---
 def analyze_scam(text, ip_address):
-    # Calculate Risk Score based on keywords
     risk_score = 0
     triggers = []
     text_lower = text.lower()
     
     keywords = {
         'urgent': 20, 'immediate': 20, 'suspend': 30, 'arrest': 40,
-        'bank': 15, 'credit': 15, 'password': 40, 'virus': 30,
-        'verify': 20, 'link': 10, 'click': 10
+        'bank': 15, 'credit': 15, 'password': 40, 'virus': 30
     }
     
     for word, score in keywords.items():
@@ -100,10 +80,8 @@ def analyze_scam(text, ip_address):
             risk_score += score
             triggers.append(word)
 
-    # Generate the Smart Reply
     reply_text = generate_counter_reply(text)
 
-    # Create the Intelligence Record
     record = {
         "timestamp": datetime.datetime.now().isoformat(),
         "scammer_ip": ip_address,
@@ -114,39 +92,39 @@ def analyze_scam(text, ip_address):
         "agent_reply_sent": reply_text
     }
     
-    # Store in Database
     SCAM_DATABASE.append(record)
-    
     return record
 
 # --- 3. THE ENDPOINTS (The "Doors") ---
 
 @app.route('/')
 def home():
-    return f"Agentic Honeypot Active. Scammers Caught So Far: {len(SCAM_DATABASE)}", 200
+    return f"Agentic Honeypot Active. Scammers Caught: {len(SCAM_DATABASE)}", 200
 
-# MAIN VALIDATION ENDPOINT (For Judges)
+# THE MAIN VALIDATION ENDPOINT
 @app.route('/api/validate', methods=['GET', 'POST', 'OPTIONS'])
 def validate():
-    # 1. Handle "Pre-flight" (Testers use this to check connection)
+    # A. Handle Pre-flight
     if request.method == 'OPTIONS':
         return '', 200
 
-    # 2. SUPER-SAFE DATA READING
-    # This prevents the 'INVALID_REQUEST_BODY' error
-    scam_text = "Connectivity Check" # Default message
+    # B. THE NUCLEAR DATA READER (Prevents INVALID_REQUEST_BODY)
+    # We read raw bytes instead of demanding JSON.
+    scam_text = "System Ping"
     try:
-        if request.is_json:
-            data = request.get_json(silent=True) or {}
-            scam_text = data.get('message') or data.get('text') or "Connectivity Check"
-        elif request.data:
-            # If they sent raw text instead of JSON, we still read it
-            scam_text = request.data.decode('utf-8', errors='ignore')
+        raw_data = request.get_data(as_text=True)
+        if raw_data:
+            # Try to parse it as JSON
+            try:
+                data = json.loads(raw_data)
+                scam_text = data.get('message') or data.get('text') or raw_data
+            except:
+                # If it's not JSON, treat it as plain text
+                scam_text = raw_data
     except Exception:
-        # If anything goes wrong reading the body, we don't crash!
-        scam_text = "System Ping"
+        pass
 
-    # 3. AUTHENTICATION
+    # C. AUTHENTICATION (Case Insensitive)
     user_key = None
     for k, v in request.headers.items():
         if k.lower() == 'x-api-key':
@@ -156,21 +134,20 @@ def validate():
     if user_key != VALID_API_KEY:
         return jsonify({"status": "fail", "message": "Unauthorized"}), 401
 
-    # 4. EXECUTE LOGIC
+    # D. EXECUTE AGENT
     client_ip = request.headers.get('x-forwarded-for', request.remote_addr)
     intelligence = analyze_scam(scam_text, client_ip)
 
-    # 5. RETURN SUCCESS
+    # E. RETURN SUCCESS
     return jsonify({
         "status": "success",
         "message": "Honeypot Logic Executed",
         "data": intelligence
     }), 200
 
-# ADMIN LOGS ENDPOINT (For You)
+# ADMIN LOGS ENDPOINT
 @app.route('/admin/logs', methods=['GET'])
 def view_logs():
-    # Simple Auth check
     key = request.args.get('key')
     if key != VALID_API_KEY:
         return "Access Denied", 403
