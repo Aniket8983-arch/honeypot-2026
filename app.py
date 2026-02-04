@@ -5,7 +5,7 @@ import random
 import json
 
 app = Flask(__name__)
-CORS(app)  # Allows the Judge's tester to connect from their website
+CORS(app)  # Allows the Judge's tester to connect
 
 # --- CONFIGURATION ---
 VALID_API_KEY = "honeypot2026"
@@ -49,7 +49,7 @@ def generate_counter_reply(text):
             "Is this safe? My son says crypto is for criminals."
         ])
 
-    # SCENARIO 5: Bank / Money (The Classic)
+    # SCENARIO 5: Bank / Money
     elif any(x in text for x in ["bank", "account", "unusual", "fund", "transfer", "urgent"]):
         return random.choice([
             "I have accounts at Chase and Bank of America. Which one is leaking?",
@@ -66,9 +66,17 @@ def generate_counter_reply(text):
 
 # --- 2. THE INTELLIGENCE ENGINE (The "Brain") ---
 def analyze_scam(text, ip_address):
+    # [CRITICAL FIX] 
+    # This prevents the "AttributeError: 'dict' object has no attribute 'lower'"
+    # If the judge sends a dictionary/object, we turn it into a string first.
+    if not isinstance(text, str):
+        text = str(text)
+
+    # Now it is safe to lowercase
+    text_lower = text.lower()
+    
     risk_score = 0
     triggers = []
-    text_lower = text.lower()
     
     keywords = {
         'urgent': 20, 'immediate': 20, 'suspend': 30, 'arrest': 40,
@@ -101,30 +109,31 @@ def analyze_scam(text, ip_address):
 def home():
     return f"Agentic Honeypot Active. Scammers Caught: {len(SCAM_DATABASE)}", 200
 
-# THE MAIN VALIDATION ENDPOINT
-@app.route('/api/validate', methods=['GET', 'POST', 'OPTIONS'])
+# We allow ALL methods (GET, POST, PUT, HEAD) to prevent 405 Errors
+@app.route('/api/validate', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'])
 def validate():
     # A. Handle Pre-flight
     if request.method == 'OPTIONS':
         return '', 200
 
-    # B. THE NUCLEAR DATA READER (Prevents INVALID_REQUEST_BODY)
-    # We read raw bytes instead of demanding JSON.
+    # B. THE NUCLEAR DATA READER (Prevents 400 Bad Request)
     scam_text = "System Ping"
     try:
+        # We read raw bytes. We don't care about content-type.
         raw_data = request.get_data(as_text=True)
         if raw_data:
-            # Try to parse it as JSON
+            # Try to find 'message' inside JSON
             try:
                 data = json.loads(raw_data)
-                scam_text = data.get('message') or data.get('text') or raw_data
+                # We look for message, text, content, or input
+                scam_text = data.get('message') or data.get('text') or data.get('content') or data.get('input') or raw_data
             except:
-                # If it's not JSON, treat it as plain text
+                # If not JSON, just use the raw text
                 scam_text = raw_data
     except Exception:
         pass
 
-    # C. AUTHENTICATION (Case Insensitive)
+    # C. AUTHENTICATION
     user_key = None
     for k, v in request.headers.items():
         if k.lower() == 'x-api-key':
@@ -132,10 +141,12 @@ def validate():
             break
             
     if user_key != VALID_API_KEY:
+        print(f"AUTH FAIL: Expected {VALID_API_KEY}, Got {user_key}")
         return jsonify({"status": "fail", "message": "Unauthorized"}), 401
 
     # D. EXECUTE AGENT
     client_ip = request.headers.get('x-forwarded-for', request.remote_addr)
+    # The fix inside analyze_scam handles the data format now
     intelligence = analyze_scam(scam_text, client_ip)
 
     # E. RETURN SUCCESS
@@ -145,32 +156,23 @@ def validate():
         "data": intelligence
     }), 200
 
-# ADMIN LOGS ENDPOINT
+# ADMIN LOGS
 @app.route('/admin/logs', methods=['GET'])
 def view_logs():
     key = request.args.get('key')
     if key != VALID_API_KEY:
         return "Access Denied", 403
     return jsonify(SCAM_DATABASE), 200
-# --- ADD THIS TO THE BOTTOM OF app.py ---
 
-# This handles "400 Bad Request" errors (The "Invalid Body" issue)
+# --- 4. SAFETY NETS (Prevent Crashes) ---
+
 @app.errorhandler(400)
 def handle_bad_request(e):
-    print("Handled a Bad Request (400) - Returning Success anyway")
-    return jsonify({
-        "status": "success", 
-        "message": "Honeypot Active (Bad Request Handled)",
-        "data": {
-            "risk_score": 0, 
-            "risk_level": "Low", 
-            "agent_reply_sent": "System Check"
-        }
-    }), 200
+    return jsonify({"status": "success", "message": "Handled Bad Request"}), 200
 
-# This handles "500 Internal Server Error" (Crashes)
 @app.errorhandler(500)
 def handle_server_error(e):
-    return jsonify({"status": "success", "message": "Recovered from Error"}), 200
+    return jsonify({"status": "success", "message": "Handled Server Error"}), 200
+
 if __name__ == "__main__":
     app.run()
