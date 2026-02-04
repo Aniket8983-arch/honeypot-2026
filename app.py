@@ -128,34 +128,39 @@ def home():
 # MAIN VALIDATION ENDPOINT (For Judges)
 @app.route('/api/validate', methods=['GET', 'POST', 'OPTIONS'])
 def validate():
-    # Handle CORS Pre-flight
+    # 1. Handle "Pre-flight" (Testers use this to check connection)
     if request.method == 'OPTIONS':
         return '', 200
 
-    # 1. READ DATA (Prevents INVALID_REQUEST_BODY)
+    # 2. SUPER-SAFE DATA READING
+    # This prevents the 'INVALID_REQUEST_BODY' error
+    scam_text = "Connectivity Check" # Default message
     try:
-        data = request.get_json(force=True, silent=True) or {}
-        scam_text = data.get('message') or data.get('text') or "Connectivity Check"
-    except:
-        scam_text = "Unknown Data Format"
+        if request.is_json:
+            data = request.get_json(silent=True) or {}
+            scam_text = data.get('message') or data.get('text') or "Connectivity Check"
+        elif request.data:
+            # If they sent raw text instead of JSON, we still read it
+            scam_text = request.data.decode('utf-8', errors='ignore')
+    except Exception:
+        # If anything goes wrong reading the body, we don't crash!
+        scam_text = "System Ping"
 
-    # 2. DEBUG LOGGING (See this in Render Logs)
-    print("--- INCOMING REQUEST ---")
+    # 3. AUTHENTICATION
     user_key = None
     for k, v in request.headers.items():
-        print(f"Header: {k} -> {v}")
         if k.lower() == 'x-api-key':
             user_key = v
-
-    # 3. AUTHENTICATION (Case Insensitive)
+            break
+            
     if user_key != VALID_API_KEY:
         return jsonify({"status": "fail", "message": "Unauthorized"}), 401
 
-    # 4. EXECUTE AGENT
+    # 4. EXECUTE LOGIC
     client_ip = request.headers.get('x-forwarded-for', request.remote_addr)
     intelligence = analyze_scam(scam_text, client_ip)
 
-    # 5. RETURN REPORT
+    # 5. RETURN SUCCESS
     return jsonify({
         "status": "success",
         "message": "Honeypot Logic Executed",
