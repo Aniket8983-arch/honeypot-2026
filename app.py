@@ -107,7 +107,8 @@ def analyze_scam(text, ip_address):
 
 @app.route('/')
 def home():
-    return f"Agentic Honeypot Active. Scammers Caught: {len(SCAM_DATABASE)}", 200
+    # We added (v2.0) so you can check if the update worked!
+    return f"Agentic Honeypot Active (v2.0). Scammers Caught: {len(SCAM_DATABASE)}", 200
 
 # We allow ALL methods (GET, POST, PUT, HEAD) to prevent 405 Errors
 @app.route('/api/validate', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'])
